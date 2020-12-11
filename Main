@@ -1,0 +1,151 @@
+import pygame
+from random import randint
+import time
+
+pygame.init()
+
+#These values change how the screen looks
+#Can be changed, but only to sensible values
+screen_width = 1000
+screen_height = 500
+block_height = 30
+block_border = 5
+speed = 0.2
+background_colour = (0,50,150) # Don't change to black or red because it will be confusing
+
+background = pygame.display.set_mode((screen_width,screen_height))
+background.fill(background_colour)
+dimensions = (screen_width//(block_height)-1,screen_height//block_height-1)
+
+
+class Block ():
+    def draw(self):
+        pygame.draw.rect(background, self.colour, (self.position[0]+block_border,self.position[1]+block_border, (block_height-block_border),(block_height-block_border)))
+    def get_position(self):
+        return self.position
+
+class Apple (Block):
+    def __init__(self):
+        self.colour = (255,0,0)
+        self.position = (randint(0,dimensions[0])*block_height,randint(0,dimensions[1])*block_height)
+        while self.position in crash_points:
+            self.position = (randint(0,dimensions[0])*block_height,randint(0,dimensions[1])*block_height)
+
+class Barrier(Block):
+    def __init__(self):
+        self.colour = (0,0,0)
+        self.position = (randint(0,dimensions[0])*block_height,randint(0,dimensions[1])*block_height)
+        while self.position in crash_points+[apple.get_position()]:
+            self.position = (randint(0,dimensions[0])*block_height,randint(0,dimensions[1])*block_height)
+        print(self.position)
+
+
+class Segment (Block):
+    def __init__ (self,pos,direction):
+        self.position = pos
+        self.colour = (randint(0,255),randint(0,255),randint(0,255))
+        while ((self.colour[0]-background_colour[0])**2+(self.colour[1]-background_colour[1])**2+(self.colour[2]-background_colour[2])**2)**(1/2) < 50:
+            self.colour = (randint(0,255),randint(0,255),randint(0,255))
+        self.dir = direction
+    def move (self):
+        x = self.position[0] + self.dir[0]*block_height
+        if x < 0:
+            x = dimensions[0] * block_height
+        elif x > block_height* dimensions[0]:
+            x = 0
+        y = self.position[1] + self.dir[1]*block_height
+        if y < 0:
+            y = dimensions[1] * block_height
+        elif y > block_height* dimensions[1]:
+            y = 0
+        self.position= (x,y)
+        
+    def change_direction (self,direction):
+        self.dir = direction
+    def get_direction(self):
+        return self.dir
+
+
+snake_segments = [Segment((2*block_height,block_height),(1,0)),Segment((block_height,block_height),(1,0)),Segment((0,block_height),(1,0))]
+crash_points = [] #This list makes it quicker to search for the locations that the snake is not allowed to go to
+for seg in snake_segments:
+    crash_points.append(seg.get_position())
+apple = Apple()
+apple.draw()
+barriers = []
+
+# Draw out the snake
+for seg in snake_segments:
+    seg.draw()
+
+pygame.display.update()
+
+# Main game loop
+dead = False
+counter = 0
+while not dead:
+    # Wait, depending on speed
+    time.sleep(speed)
+
+    # Check for key presses
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            dead = True
+        elif event.type == pygame.KEYDOWN:
+            #Doesn't allow the user to go in the opposite direction that they are currently going
+            if event.key == pygame.K_RIGHT and snake_segments[0].get_direction() != (1,0):
+                snake_segments[0].change_direction((1,0))
+            elif event.key == pygame.K_LEFT and snake_segments[0].get_direction() != (-1,0):
+                snake_segments[0].change_direction((-1,0))
+            elif event.key == pygame.K_DOWN and snake_segments[0].get_direction() != (0,-1):
+                snake_segments[0].change_direction((0,1))
+            elif event.key == pygame.K_UP and snake_segments[0].get_direction() != (0,1):
+                snake_segments[0].change_direction((0,-1))
+
+
+    # Move all segments forward
+    
+    last_pos = snake_segments[-1].get_position()
+    direction = snake_segments[0].get_direction()
+    for seg in snake_segments:
+        cdir = seg.get_direction()
+        seg.move() 
+        seg.change_direction(direction)
+        direction = cdir
+    if snake_segments[0].get_position() in crash_points:
+
+        dead = True
+        print('You crashed')
+
+    # Update crash_points
+    crash_points.insert(0,snake_segments[0].get_position())
+    crash_points.pop(len(snake_segments))
+
+    # Check for crashes + apples
+    if snake_segments[0].get_position() == apple.get_position():
+        counter += 1
+        snake_segments.append(Segment(last_pos,direction))
+        crash_points.insert(len(snake_segments),last_pos)
+        apple = Apple()
+        apple.draw()
+
+    # Increase difficulty
+    if counter == 3:
+        counter = 0
+        speed = speed*0.8
+        barriers.append(Barrier())
+        crash_points.append(barriers[-1].get_position())
+        print(crash_points)
+
+    # Draw out the whole board
+    pygame.draw.rect(background, background_colour, (last_pos[0],last_pos[1],block_height,block_height))
+
+    for seg in snake_segments:
+        seg.draw()
+    for b in barriers:
+        b.draw()
+
+    pygame.display.update()
+        
+
+pygame.quit()
